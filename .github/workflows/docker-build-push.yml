@@ -22,9 +22,29 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Get next tag
+        id: next_tag
+        run: |
+          echo "Fetching existing tags..."
+          tags=$(curl -s "https://hub.docker.com/v2/repositories/jibu07/hkp-frontend/tags?page_size=100" | jq -r '.results[].name' | grep -E '^armv[0-9]+$' | sort -V)
+          echo "Existing tags: $tags"
+          
+          if [ -z "$tags" ]; then
+            next="armv1"
+          else
+            last_tag=$(echo "$tags" | tail -n1)
+            num=$(echo $last_tag | sed 's/armv//')
+            next="armv$((num+1))"
+          fi
+
+          echo "Next tag is $next"
+          echo "next_tag=$next" >> $GITHUB_OUTPUT
+
       - name: Build and Push Docker image
         uses: docker/build-push-action@v4
         with:
           context: .
           push: true
-          tags: jibu07/hkp-frontend:latest
+          tags: |
+            jibu07/hkp-frontend:latest
+            jibu07/hkp-frontend:${{ steps.next_tag.outputs.next_tag }}
